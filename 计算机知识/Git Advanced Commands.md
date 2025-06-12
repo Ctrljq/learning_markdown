@@ -1,3 +1,7 @@
+
+
+[TOC]
+
 # 🌳 Git 高级命令与统计分析
 
 > 继 Git 基础操作后，本文简明介绍 `git merge`，`git fetch`，`git log`等命令以及其实际使用场景，帮助理解 Git 仓库统计与分支合并流程。
@@ -116,12 +120,20 @@ git log --oneline --graph --all --decorate
 
 ### 示例图：
 
-```
-* 64df1d2 (HEAD -> main) add doc
-|
-* 5e8a1b2 (origin/main, origin/HEAD) fix bug
-|
-* 41f1ac0 init project
+```bash
+HUAWEI@LBJ MINGW64 /d/学习资料/learning_markdown (main)
+$ git log
+commit 51913eddc03d9cd4486f4b2158991264ce32a553 (HEAD -> main, origin/main, origin/HEAD)
+Author: Ctrljq <bj332229@gmail.com>
+Date:   Thu Jun 12 17:05:43 2025 +0800
+
+    add some files
+
+commit 03a364c3ea596f613ec2fd030b29a931ed59c4b9
+Author: Ctrljq <145275642+Ctrljq@users.noreply.github.com>
+Date:   Thu Jun 12 15:58:35 2025 +0800
+
+    Initial commit
 ```
 
 ------
@@ -152,11 +164,9 @@ git log --oneline --graph --all --decorate
 
 ------
 
-若需规则化的 Git commit 信息统一风格，我也可以继续补充。
-
 ### case2：
 
-**拉取远端仓库最新代码并覆盖原有的本地代码**
+**拉取远端代码覆盖本地改动**
 
 1.丢弃本地修改
 
@@ -197,6 +207,43 @@ git pull
 
 git stash pop  # 可能会有冲突需要解决
 ```
+
+### case3：
+
+**==使用git add，git commit的文件，不想push了，怎么撤回==**
+
+当你使用 `git reset --soft HEAD~1` 命令后，**只有提交 (commit) 会被撤销**，而不会影响暂存区 (staging area) 和工作目录 (working directory) 中的内容。具体来说：
+
+1. **提交被撤销**：最后一次的 commit 会被移除，HEAD 指针会回退到上一个提交
+2. **暂存区保持不变**：之前通过 `git add` 添加到暂存区的文件仍然在暂存区中
+3. **工作目录保持不变**：所有修改的文件内容都不会改变
+
+这意味着，执行 `git reset --soft HEAD~1` 后，你可以重新编辑提交信息，或者将这些更改拆分成多个提交，然后再次执行 `git commit`。
+
+**示例场景**
+
+假设你有以下操作历史：
+
+```bash
+git add file1.txt file2.txt  # 添加文件到暂存区
+git commit -m "Initial commit"  # 提交到本地仓库
+git reset --soft HEAD~1  # 撤销最近的提交
+```
+
+执行完上述命令后：
+
+- `file1.txt` 和 `file2.txt` 的修改仍然在暂存区中
+- 你可以使用 `git status` 看到这些文件处于 "Changes to be committed" 状态
+- 你可以直接执行 `git commit` 重新提交，或者添加 / 移除暂存区中的文件后再提交
+
+#### 与其他模式的对比
+
+- `git reset --soft`：只撤销提交，保留暂存区和工作目录
+- `git reset --mixed`（默认模式）：撤销提交和暂存区，保留工作目录
+- `git reset --hard`：撤销提交、暂存区和工作目录，彻底删除所有更改
+- 如果你想撤销特定的提交（不只是最近的一个），可以指定提交的哈希值`git reset --soft <commit-hash>`
+
+选择哪种模式取决于你想要保留多少之前的更改。
 
 ## 七、命令对比
 
