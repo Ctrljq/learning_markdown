@@ -1,0 +1,178 @@
+# 一、dataset
+
+## 1、help（dataset）
+
+`Dataset` 是一个抽象类，主要用于表示一个**数据集**，在 PyTorch 中，它定义了如何组织和访问数据样本。所有需要表示键到数据样本映射的数据集都应继承这个类，并实现其中的部分方法。让我们分解一下它的主要部分和用途。
+
+### **`Dataset` 类的主要功能**
+
+1. **抽象基类**：
+   `Dataset` 是一个抽象类，它不能直接被实例化。它定义了一些标准的方法，如 `__getitem__` 和（可选的）`__len__`，这些方法需要在子类中实现。继承该类时，你需要重写这些方法，定义如何通过索引获取数据样本，以及数据集的大小。
+
+2. **重要方法**：
+   - `__getitem__(self, index)`: 必须重写。该方法定义如何通过键（通常是整数索引）获取数据样本。任何基于 `Dataset` 的数据集类都需要实现这个方法。
+   - `__len__(self)`: 可选重写。该方法应返回数据集中样本的数量。如果要支持使用 `DataLoader` 进行采样操作，建议实现这个方法。
+   - `__getitems__(self, indices)`: 可选重写。为了加快批量加载样本的速度，该方法可以接受一组索引，并返回相应的样本。实现这个方法可以优化批量数据加载的性能。
+
+3. **加法操作符重载 (`__add__`)**：
+   `Dataset` 类支持使用 `+` 操作符来拼接两个数据集。调用 `__add__` 方法后，会返回一个新的 `ConcatDataset`，它代表两个数据集的拼接。
+
+   - `__add__(self, other: 'Dataset[T_co]') -> 'ConcatDataset[T_co]'`: 当两个 `Dataset` 进行相加操作时，返回一个 `ConcatDataset` 对象，这个新对象表示这两个数据集的连接。
+
+4. **类型提示**：
+   `Dataset` 使用了泛型类型提示（`typing.Generic`）。在 `Dataset` 的类型签名中，`T_co` 表示协变类型的泛型参数，确保你可以在子类中实现灵活的数据类型处理。
+
+5. **与 `DataLoader` 的交互**：
+   - `Dataset` 类与 PyTorch 的 `DataLoader` 紧密结合使用。`DataLoader` 通过 `__getitem__` 和（可选的）`__len__` 方法加载数据。默认情况下，`DataLoader` 假设索引是整数（从 0 开始递增的索引），但可以通过自定义采样器来处理非整数或非连续的索引。
+
+
+
+### **一个自定义 `Dataset` 示例**
+
+为了更好地理解，我们来看一个简单的自定义数据集类，继承自 `Dataset`，并实现必要的 `__getitem__` 和 `__len__` 方法：
+
+```python
+import torch
+from torch.utils.data import Dataset
+
+# 自定义数据集
+class MyDataset(Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __getitem__(self, index):
+        # 根据索引获取数据
+        return self.data[index]
+
+    def __len__(self):
+        # 返回数据集的大小
+        return len(self.data)
+
+# 创建一个包含数字的数据集
+data = [1, 2, 3, 4, 5]
+dataset = MyDataset(data)
+
+# 获取数据集中的某个样本
+print(dataset[2])  # 输出：3
+
+# 获取数据集大小
+print(len(dataset))  # 输出：5
+```
+
+### **实际应用**
+
+1. **用于加载自定义数据**：你可以通过继承 `Dataset` 类来加载你自己的数据，如图像、文本、音频等。通过实现 `__getitem__`，你可以定义如何从文件、数据库或其他来源中加载数据。
+
+2. **与 `DataLoader` 配合**：通常你会将自定义的 `Dataset` 传递给 `DataLoader`，后者会帮助你处理批量数据加载、打乱数据、并行加载等任务。
+
+   ```python
+   from torch.utils.data import DataLoader
+   
+   # 使用 DataLoader 来加载数据
+   dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+   
+   for batch in dataloader:
+       print(batch)
+   ```
+
+### **总结**
+
+- `Dataset` 是 PyTorch 中用于数据加载的抽象基类。
+- 子类必须实现 `__getitem__` 方法，并可选地实现 `__len__` 方法以支持索引访问和数据集大小查询。
+- `Dataset` 可以与 `DataLoader` 一起使用，以便批量加载和处理数据。
+
+## 2、常见对象变量
+
+1. **self.data**:
+   - 通常保存数据本身，比如图像、文本或其他格式的数据。在子类中可以通过 `self.data` 引用。
+   - 类型可以是 `list`、`numpy array`、`Pandas DataFrame`、`torch.Tensor` 或其他数据结构，具体取决于数据集的格式。
+2. **self.labels**:
+   - 保存数据对应的标签（监督学习中的目标值），例如分类任务中的类别标签、回归任务中的数值等。
+   - 标签类型通常是 `list` 或 `numpy array`，也可以是 `torch.Tensor`。
+3. **self.transform**（可选）:
+   - 一些数据集会包含数据增强或预处理操作，通过 `transform` 对象变量指定。常用于图像数据集，如对数据进行随机裁剪、旋转、归一化等。
+   - `self.transform` 通常保存一个函数或操作链，在调用 `__getitem__` 时对数据进行预处理。
+4. **self.target_transform**（可选）:
+   - 类似于 `self.transform`，但针对的是标签的变换。例如，将标签转换为 one-hot 编码，或者进行某些形式的标准化。
+5. **self.paths**（可选）:
+   - 如果数据是以文件路径形式存储的（例如图片路径），可以将路径存储为对象变量 `self.paths`，然后在 `__getitem__` 中根据路径加载数据。
+
+## 3、`__init__()与__getitem__()`
+
+```py
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import torch
+
+from torch.utils.data import Dataset
+from PIL import Image
+import os
+
+class MyData(Dataset):
+    def __init__(self,root_dir,label_dir):
+        self.root_dir=root_dir
+        self.label_dir=label_dir
+        self.path=os.path.join(self.root_dir,self.label_dir)
+        self.img_path=os.listdir(self.path)
+
+    def __getitem__(self, idx):
+        img_name=self.img_path[idx]
+        img_item_path=os.path.join(self.root_dir,self.label_dir,img_name)
+        img=Image.open(img_item_path)
+        label=self.label_dir
+        return img,label
+
+    def __len__(self):
+        return len(self.img_path)
+
+root_dir=r'dataset/train'
+ants_label_dir='ants'
+ants_dataset=MyData(root_dir,ants_label_dir)
+# ants_dataset[0]  每当你调用 ants_dataset[0]，会触发 __getitem__() 方法的执行，并返回一个数据样本。
+# train_datasrt = ants_dataset + bees_dataset 合并数据集
+
+```
+
+
+
+> 当你执行 `ants_dataset = MyData(root_dir, ants_label_dir)` 这一步时，并 **没有初始化很多个对象**，而是仅仅创建了 `MyData` 类的 **一个对象**，并存储在 `ants_dataset` 变量中。
+>
+> ### 具体解释：
+>
+> #### 1. **实例化一个 `MyData` 对象**
+> 执行 `MyData(root_dir, ants_label_dir)` 时，Python 调用了 `MyData` 类的 `__init__()` 方法来创建并初始化这个类的一个实例（即对象）。这个过程涉及以下几个步骤：
+>
+> - `root_dir` 和 `label_dir` 作为参数传递给了 `__init__()`，分别存储为对象的属性 `self.root_dir` 和 `self.label_dir`。
+> - 使用 `os.path.join(self.root_dir, self.label_dir)` 构建了图片所在目录的路径（例如 `dataset/train/ants`），并存储为 `self.path`。
+> - 通过 `os.listdir(self.path)` 列出了 `ants` 文件夹下的所有文件名，结果存储为 `self.img_path`（即数据集中的图片文件列表）。
+>
+> 这一步只创建了一个 `MyData` 对象，并将该对象引用赋值给变量 `ants_dataset`。
+>
+> #### 2. **为什么没有初始化多个对象？**
+> ==`MyData` 类的实例化只发生一次。你在 `__init__()` 方法中并没有创建多个对象==，事实上，它只是：
+>
+> - ==记录了图片目录路径。==
+> - ==列出了该目录下的文件列表。==
+> - ==准备好在后续调用 `__getitem__()` 时，能够按索引获取数据。==
+>
+> 尽管这个类的核心功能是管理图片数据，但数据本身只是路径和文件名的列表，图片数据并没有被真正加载到内存中。==图片是在你调用 `__getitem__()` 时（例如，`ants_dataset[0]`）才被动态加载的。==
+>
+> ### 3. **调用 `__getitem__()` 时才会加载数据**
+> ==当你调用 `ants_dataset[0]` 时，实际上触发了 `MyData` 类中的 `__getitem__()` 方法。此时，才根据给定的索引去读取具体的图片。==
+>
+> 每次你访问 `ants_dataset` 中的一个样本时：
+> - ==它根据 `idx` 索引，查找 `self.img_path` 中对应的图片文件名。==
+> - 然后使用 `PIL.Image.open()` 动态加载这张图片，返回图片对象和标签。
+>
+> 因此，每次你调用 `ants_dataset[idx]` 时，并不会提前加载所有的图片数据，只会根据你需要的索引加载相应的图片。
+>
+> ### 4. **总结：**
+> - `ants_dataset = MyData(root_dir, ants_label_dir)` 只会初始化一个 `MyData` 类的实例对象，存储图片路径和文件名等元数据。
+> - 数据集中的图片并不会被提前加载，只有在你调用 `__getitem__()` 时，图片才会动态加载。
+> - 每次调用 `ants_dataset[idx]`，会根据索引加载对应图片并返回图片和标签。
+>
+> 这符合深度学习中常用的 **惰性加载（Lazy Loading）** 原则，尤其是在处理大量数据时（例如图像数据），我们不会一次性加载所有数据，而是按需加载，节省内存。
+
+# 二、TensorBoard
+
